@@ -56,7 +56,9 @@
             unset = true,
             input,
             component = false,
+            textBoxBlocker = false,
             widget = false,
+            overlay = false,
             use24Hours,
             minViewModeNumber = 0,
             actualFormat,
@@ -284,8 +286,9 @@
                 }
                 if (options.toolbarPlacement === 'bottom') {
                     content.append(toolbar);
-                }
-                return template.append(content);
+                }                
+                template.append(content);
+                return template;
             },
 
             dataToOptions = function () {
@@ -306,12 +309,17 @@
             },
 
             place = function () {
-                var offset = (component || element).position(),
+                widget.css({
+                    display: "none"
+                });
+
+                var offset = (component || element).offset(),
                     vertical = options.widgetPositioning.vertical,
                     horizontal = options.widgetPositioning.horizontal,
                     parent;
 
                 if (options.widgetParent) {
+                    options.widgetParent.append(overlay);
                     parent = options.widgetParent.append(widget);
                 } else if (element.is('input')) {
                     parent = element.parent().append(widget);
@@ -320,54 +328,102 @@
                     element.children().first().after(widget);
                 }
 
-                // Top and bottom logic
-                if (vertical === 'auto') {
-                    if ((component || element).offset().top + widget.height() > $(window).height() + $(window).scrollTop() &&
-                            widget.height() + element.outerHeight() < (component || element).offset().top) {
-                        vertical = 'top';
-                    } else {
-                        vertical = 'bottom';
-                    }
-                }
+                var verticalPosition = "";
 
-                // Left and right logic
-                if (horizontal === 'auto') {
-                    if (parent.width() < offset.left + widget.outerWidth()) {
-                        horizontal = 'right';
-                    } else {
-                        horizontal = 'left';
-                    }
-                }
-
-                if (vertical === 'top') {
-                    widget.addClass('top').removeClass('bottom');
+                if (offset.top > widget.height()) {
+                    verticalPosition = "top";
+                } else if (parent.height() - offset.top - (component || element).height() >  widget.height()) {
+                    verticalPosition = "bottom";
                 } else {
-                    widget.addClass('bottom').removeClass('top');
+                    verticalPosition = "middle";
                 }
 
-                if (horizontal === 'right') {
-                    widget.addClass('pull-right');
+                if (((parent.height() - (component || element).height()) / 2) > offset.top && verticalPosition !== "middle") {
+                    verticalPosition = "bottom";
+                }
+
+                var horizontalPosition = "";
+
+                if (offset.left > widget.width()) {
+                    horizontalPosition = "left";
+                } else if (parent.width() - offset.left - (component || element).width() >  widget.width()) {
+                    horizontalPosition = "right";
                 } else {
-                    widget.removeClass('pull-right');
+                    horizontalPosition = "center";
                 }
 
-                // find the first parent element that has a relative css positioning
-                if (parent.css('position') !== 'relative') {
-                    parent = parent.parents().filter(function () {
-                        return $(this).css('position') === 'relative';
-                    }).first();
+                if (((parent.width() - (component || element).width()) / 2) > offset.left && horizontalPosition !== "center") {
+                    horizontalPosition = "right";
                 }
 
-                if (parent.length === 0) {
-                    throw new Error('datetimepicker component should be placed within a relative positioned container');
+                var y = {
+                    top: offset.top - widget.height(),
+                    bottom: offset.top + (component || element).height(),
+                    middle: offset.top + (component || element).height() / 2
                 }
+
+                var x = {
+                    left: offset.left - widget.width(),
+                    right: offset.left + (component || element).width(),
+                    center: offset.left + (component || element).width() / 2
+                }
+
+                console.log(verticalPosition, horizontalPosition);
 
                 widget.css({
-                    top: vertical === 'top' ? 'auto' : offset.top + element.outerHeight(),
-                    bottom: vertical === 'top' ? offset.top + element.outerHeight() : 'auto',
-                    left: horizontal === 'left' ? parent.css('padding-left') : 'auto',
-                    right: horizontal === 'left' ? 'auto' : parent.css('padding-right')
+                    top: y[verticalPosition],
+                    left: x[horizontalPosition],
+                    display: "block"
                 });
+
+                // // Top and bottom logic
+                // if (vertical === 'auto') {
+                //     if ((component || element).offset().top + widget.height() > $(window).height() + $(window).scrollTop() &&
+                //             widget.height() + element.outerHeight() < (component || element).offset().top) {
+                //         vertical = 'top';
+                //     } else {
+                //         vertical = 'bottom';
+                //     }
+                // }
+
+                // // Left and right logic
+                // if (horizontal === 'auto') {
+                //     if (parent.width() < offset.left + widget.outerWidth()) {
+                //         horizontal = 'right';
+                //     } else {
+                //         horizontal = 'left';
+                //     }
+                // }
+
+                // if (vertical === 'top') {
+                //     widget.addClass('top').removeClass('bottom');
+                // } else {
+                //     widget.addClass('bottom').removeClass('top');
+                // }
+
+                // if (horizontal === 'right') {
+                //     widget.addClass('pull-right');
+                // } else {
+                //     widget.removeClass('pull-right');
+                // }
+
+                // find the first parent element that has a relative css positioning
+                // if (parent.css('position') !== 'relative') {
+                //     parent = parent.parents().filter(function () {
+                //         return $(this).css('position') === 'relative';
+                //     }).first();
+                // }
+
+                // if (parent.length === 0) {
+                //     throw new Error('datetimepicker component should be placed within a relative positioned container');
+                // }
+
+                // widget.css({
+                //     top: vertical === 'top' ? 'auto' : offset.top + element.outerHeight(),
+                //     bottom: vertical === 'top' ? offset.top + element.outerHeight() : 'auto',
+                //     left: horizontal === 'left' ? offset.left : 'auto',
+                //     right: horizontal === 'left' ? 'auto' : offset.right
+                // });
             },
 
             notifyEvent = function (e) {
@@ -712,7 +768,8 @@
                 $(window).off('resize', place);
                 widget.off('click', '[data-action]');
                 widget.off('mousedown', false);
-
+                overlay.remove();
+                overlay = false;
                 widget.remove();
                 widget = false;
 
@@ -930,6 +987,8 @@
                     setValue(currentMoment);
                 }
 
+                overlay = $("<div style='position: fixed;top: 0;right: 0px;bottom: 0;left: 0; z-index: 8999'></div>");
+                overlay.on('click', hide);
                 widget = getTemplate();
 
                 fillDow();
@@ -943,7 +1002,7 @@
                 showMode();
 
                 $(window).on('resize', place);
-                widget.on('click', '[data-action]', doAction); // this handles clicks on the widget
+                widget.on('click', '[data-action]', doAction); // this handles clicks on the widget                
                 widget.on('mousedown', false);
 
                 if (component && component.hasClass('btn')) {
@@ -952,9 +1011,9 @@
                 widget.show();
                 place();
 
-                if (!input.is(':focus')) {
-                    input.focus();
-                }
+                // if (!input.is(':focus')) {
+                //     input.focus();
+                // }
 
                 notifyEvent({
                     type: 'dp.show'
@@ -995,7 +1054,11 @@
                     'change': change,
                     'blur': hide,
                     'keydown': keydown
-                });
+                });  
+
+                if (textBoxBlocker) {
+                    textBoxBlocker.on('click', toggle);
+                }            
 
                 if (element.is('input')) {
                     input.on({
@@ -1614,6 +1677,10 @@
                 component = element.find('[class^="input-group-"]');
             } else {
                 component = element.find('.datepickerbutton');
+            }
+
+            if (element.find('.text-box-blocker').size() >= 0) {
+                textBoxBlocker = element.find('.text-box-blocker');
             }
         }
 
